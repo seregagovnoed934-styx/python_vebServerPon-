@@ -163,7 +163,7 @@ def repl():
             print(f"Произошла ошибка: {e}")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     # Тестовые данные для демонстрации
     u0 = create_user("192.168.0.1")
     u1 = create_user("10.0.0.5")
@@ -179,4 +179,4 @@ if __name__ == "__main__":
     print(select())
     
     # Запуск интерактивного режима
-    repl()
+    repl()  # pragma: no cover
