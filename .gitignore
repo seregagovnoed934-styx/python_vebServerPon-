@@ -1,6 +1,7 @@
 __pycache__/
 *.pyc
+.hypothesis/
 .pytest_cache/
 .coverage
 htmlcov/
-.vscode/
+main.txt
