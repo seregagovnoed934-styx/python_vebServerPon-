@@ -4,14 +4,14 @@ import json
 import socket
 import struct
 import sys
-from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src import main as db  # noqa: E402
+from src import main as db
 
 HOST = "127.0.0.1"
 PORT = 9999
 PROTOCOL_VERSION = 1
+MAX_CONNECTIONS = 5
+REQ_HEADER_SIZE = 5
 
 OP_CREATE_USER = 1
 OP_CREATE_MESSAGE = 2
@@ -20,8 +20,6 @@ OP_GET_USERS = 4
 OP_GET_MESSAGES = 5
 OP_GET_COMPLETIONS = 6
 OP_SELECT = 7
-
-REQ_HEADER_SIZE = 5
 
 
 def handle_request(opcode: int, payload: dict) -> dict:
@@ -84,7 +82,7 @@ def start_server():
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind((HOST, PORT))
-    srv.listen(5)
+    srv.listen(MAX_CONNECTIONS)
 
     while True:
         conn, _ = srv.accept()

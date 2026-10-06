@@ -1,3 +1,5 @@
+"""Модуль работы с ин-мемори хранилищем данных."""
+
 import time
 
 TIME_WINDOW_SECONDS = 540
@@ -54,41 +56,90 @@ def get_completions():
     return completions_table
 
 
-def select():
-    """Выполняет выборку Full Outer Join с временным фильтром."""
-    now = time.time()
-    result = []
-    matched_messages = set()
-    matched_users = set()
-
-    for comp in completions_table:
-        c_state, m_id = comp[1], comp[2]
-        msg = next((m for m in messages_table if m[0] == m_id), None)
-        if msg:
-            m_desc, m_time, u_id = msg[1], msg[2], msg[3]
-            if now - m_time <= TIME_WINDOW_SECONDS:
-                matched_messages.add(m_id)
-                usr = next((u for u in users_table if u[0] == u_id), None)
-                if usr:
-                    matched_users.add(u_id)
-                    result.append((c_state, m_desc, usr[1]))
-                else:
-                    result.append((c_state, m_desc, None))
-
+def _find_message(m_id: int):
+    """Вспомогательная функция поиска сообщения по ID."""
     for msg in messages_table:
-        m_id, m_desc, m_time, u_id = msg[0], msg[1], msg[2], msg[3]
-        if m_id not in matched_messages:
-            if now - m_time <= TIME_WINDOW_SECONDS:
-                usr = next((u for u in users_table if u[0] == u_id), None)
-                if usr:
-                    matched_users.add(u_id)
-                    result.append((None, m_desc, usr[1]))
-                else:
-                    result.append((None, m_desc, None))
+        if msg[0] == m_id:
+            return msg
+    return None
 
+
+def _find_user(u_id: int):
+    """Вспомогательная функция поиска пользователя по ID."""
+    for usr in users_table:
+        if usr[0] == u_id:
+            return usr
+    return None
+
+
+def _join_single_comp(comp, now, matched_msgs, matched_usrs):
+    """Обрабатывает одну запись статуса."""
+    c_state, m_id = comp[1], comp[2]
+    msg = _find_message(m_id)
+    if not msg:
+        return None
+    m_desc, m_time, u_id = msg[1], msg[2], msg[3]
+    if now - m_time > TIME_WINDOW_SECONDS:
+        return None
+    matched_msgs.add(m_id)
+    usr = _find_user(u_id)
+    if usr:
+        matched_usrs.add(u_id)
+        return (c_state, m_desc, usr[1])
+    return (c_state, m_desc, None)
+
+
+def _process_completions(now, matched_msgs, matched_usrs):
+    """Обрабатывает слияние по таблице статусов."""
+    res = []
+    for comp in completions_table:
+        item = _join_single_comp(comp, now, matched_msgs, matched_usrs)
+        if item:
+            res.append(item)
+    return res
+
+
+def _join_single_msg(msg, now, matched_msgs, matched_usrs):
+    """Обрабатывает одно несовпавшее сообщение."""
+    m_id, m_desc, m_time, u_id = msg[0], msg[1], msg[2], msg[3]
+    if m_id in matched_msgs or (now - m_time > TIME_WINDOW_SECONDS):
+        return None
+    usr = _find_user(u_id)
+    if usr:
+        matched_usrs.add(u_id)
+        return (None, m_desc, usr[1])
+    return (None, m_desc, None)
+
+
+def _process_unmatched_msgs(now, matched_msgs, matched_usrs):
+    """Обрабатывает несовпавшие сообщения."""
+    res = []
+    for msg in messages_table:
+        item = _join_single_msg(msg, now, matched_msgs, matched_usrs)
+        if item:
+            res.append(item)
+    return res
+
+
+def _process_unmatched_usrs(matched_usrs):
+    """Обрабатывает несовпавших пользователей."""
+    res = []
     for usr in users_table:
         u_id, u_ip = usr[0], usr[1]
-        if u_id not in matched_users:
-            result.append((None, None, u_ip))
+        if u_id not in matched_usrs:
+            res.append((None, None, u_ip))
+    return res
 
-    return result
+
+def select():
+    """Выполняет выборку Full Outer Join с фильтром по времени."""
+    now = time.time()
+    matched_msgs = set()
+    matched_usrs = set()
+
+    part1 = _process_completions(now, matched_msgs, matched_usrs)
+    part2 = _process_unmatched_msgs(now, matched_msgs, matched_usrs)
+    part3 = _process_unmatched_usrs(matched_usrs)
+
+    return part1 + part2 + part3
+

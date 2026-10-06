@@ -6,6 +6,8 @@ import struct
 
 HOST = "127.0.0.1"
 PORT = 9999
+RESP_HEADER_SIZE = 7
+TIMEOUT_SECONDS = 5.0
 
 OP_CREATE_USER = 1
 OP_CREATE_MESSAGE = 2
@@ -23,7 +25,7 @@ class RPCClient:
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.settimeout(5.0)
+        self.sock.settimeout(TIMEOUT_SECONDS)
         self.sock.connect((self.host, self.port))
 
     def _send_request(self, opcode: int, payload: dict):
@@ -31,8 +33,8 @@ class RPCClient:
         header = struct.pack("<BI", opcode, len(body_bytes))
         self.sock.sendall(header + body_bytes)
 
-        resp_hdr = self.sock.recv(7)
-        if not resp_hdr or len(resp_hdr) < 7:
+        resp_hdr = self.sock.recv(RESP_HEADER_SIZE)
+        if not resp_hdr or len(resp_hdr) < RESP_HEADER_SIZE:
             raise ConnectionError("Invalid response header")
 
         _, _, body_len = struct.unpack("<BHI", resp_hdr)
@@ -99,3 +101,5 @@ def run_demo():
 
 if __name__ == "__main__":
     run_demo()
+
+    

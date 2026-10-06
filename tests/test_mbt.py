@@ -1,13 +1,9 @@
 """Модуль генеративного тестирования на основе моделей (MBT)."""
 
-import sys
-from pathlib import Path
-
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, RuleBasedStateMachine, rule
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
-from src import main as db  # noqa: E402
+from src import main as db
 
 
 class DatabaseMBT(RuleBasedStateMachine):
@@ -41,6 +37,17 @@ class DatabaseMBT(RuleBasedStateMachine):
         return msg_id
 
     @rule(
+        target=messages,
+        description=st.text(min_size=1, max_size=20),
+        fake_user_id=st.integers(min_value=9000, max_value=9999),
+    )
+    def create_orphan_message(self, description, fake_user_id):
+        """Тест сообщения без существующего пользователя."""
+        msg_id = db.create_message(description, fake_user_id)
+        assert msg_id is not None
+        return msg_id
+
+    @rule(
         state=st.sampled_from(["SUCCESS", "RESOLVED", "FAILED"]),
         message_id=messages,
     )
@@ -50,10 +57,14 @@ class DatabaseMBT(RuleBasedStateMachine):
         assert comp_id is not None
 
     @rule()
-    def verify_select(self):
-        """Тест выборки данных."""
+    def verify_getters_and_select(self):
+        """Тест получения списков и выборки данных."""
+        assert isinstance(db.get_users(), list)
+        assert isinstance(db.get_messages(), list)
+        assert isinstance(db.get_completions(), list)
         res = db.select()
         assert isinstance(res, list)
 
 
 TestDatabaseMBT = DatabaseMBT.TestCase
+
